@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+		<meta name="viewport" content="width=1200" />
+		<title>Nokia Location Platform > Visualize Business data</title>
+    	<script src="lib/CodeMirror/codemirror.js" type="text/javascript"></script>
+    	<script src="lib/CodeMirror/javascript.js" type="text/javascript"></script>
+		<link href="lib/CodeMirror/codemirror.css" rel="stylesheet" type="text/css"/>
+		<link href="lib/CodeMirror/docs.css" rel="stylesheet" type="text/css"/>
+		<link href="lib/fathom/fathom.sample.css" rel="stylesheet" type="text/css" />
+		<script src="lib/jquery/jquery.min.js" type="text/javascript"></script>
+		<script src="lib/fathom/fathom.js" type="text/javascript"></script>
+		<script type="text/javascript">
+			window.myTimer = null;
+			window.myCounter = 0;
+			var demo = (window.demo = {});
+			demo.scriptState = null;
+			demo.show_map = function() {
+				$("#example_bar").animate({
+					height: "80%",
+					duration: 1000,
+					top: "0"
+				});
+			};
+			demo.show_map_half = function() {
+				$("#example_bar").animate({
+					height: "40%",
+					duration: 1000,
+					top: "0"
+				});
+			};	
+			demo.hide_map = function() {
+				$("#example_bar").animate({
+					height: "80%",
+					top: "-80%",
+					duration: 1000
+				});
+			};
+			demo.createMap = function() {
+				delete window.map;
+				var node = document.getElementById("example_bar");
+				node.innerHTML = "";
+				// Providing credentials, the ones mentioned here are just valid for demoing purposes
+				nokia.Settings.set("appId","_peU-uCkp-j8ovkzFGNU");
+				nokia.Settings.set("authenticationToken", "gBoUkAMoxoqIWfxWA5DuMQ");				
+				//nokia.maps.util.ApplicationContext.set({"appId": "_peU-uCkp-j8ovkzFGNU", "authenticationToken": "gBoUkAMoxoqIWfxWA5DuMQ"});
+				// Create a map inside the map container DOM node
+				window.map = new nokia.maps.map.Display(document.getElementById("example_bar"), {
+					components: [
+						// We add the behavior component to allow panning / zooming of the map
+						new nokia.maps.map.component.Behavior()
+					],
+					center: [52.51, 13.4], // Berlin
+					zoomLevel: 12
+				});				
+			};
+			demo.addMarker = function() {
+				demo.createMap();
+//					svgParser =  ;
+				//create data
+				var singleData = (window.singleData = {
+					id: "Where Camp", 
+					latitude: 52.54452,
+					longitude: 13.35467
+				}),
+				// create a Marker out of the given data
+				marker = (window.marker = new nokia.maps.map.Marker(singleData));
+				// show the Marker on the map
+				window.map.objects.add(marker);
+				window.map.set("center", singleData);
+			};
+			demo.addMoreMarker = function() {
+				demo.addMarker();
+				var dataSet = (window.dataSet = []),
+					lat = window.singleData.latitude,
+					lng = window.singleData.longitude,
+					iconSVG = 
+						'<svg width="33" height="33" xmlns="http://www.w3.org/2000/svg">' +
+						'<circle stroke="__ACCENTCOLOR__" fill="__MAINCOLOR__" cx="16" cy="16" r="16" />' +
+						'<text x="16" y="20" font-size="10pt" font-family="arial" font-weight="bold" text-anchor="middle" fill="__ACCENTCOLOR__" textContent="__TEXTCONTENT__">__TEXT__</text>' +
+						'</svg>',
+					svgParser = new nokia.maps.gfx.SvgParser(),
+					// create a container to group the created markers
+					container = (window.container = new nokia.maps.map.Container());
+					createIcon = function (text, mainColor, accentColor) {
+						var svg = iconSVG
+							.replace(/__TEXTCONTENT__/g, text)
+							.replace(/__TEXT__/g, text)
+							.replace(/__ACCENTCOLOR__/g, accentColor)
+							.replace(/__MAINCOLOR__/g, mainColor);
+						return new nokia.maps.gfx.GraphicsImage(svgParser.parseSvg(svg));
+					};
+				// create 1000 data entries and Markers out of it
+				for (var i=0, d; i<100; i++) {
+					d = {
+						id: "Dummy "+i,
+						latitude: lat + Math.random() / 5 - 0.1,
+						longitude: lng + Math.random() / 5 - 0.1		
+					};
+					dataSet.push(d);
+					container.objects.add(new nokia.maps.map.Marker(d, {
+						icon: createIcon(i, '#'+Math.floor(Math.random()*16777215).toString(16), "#FFF")
+					}));
+				}
+				// add the container with the 100 markers to the map
+				window.map.objects.add(container);
+				window.map.zoomTo(window.container.getBoundingBox());
+			};
+			demo.analytics = function() {
+				demo.addMoreMarker();
+				// taking advantage of the inbuilt provider architecture to overlay the map with additional layers
+				var hmProvider = (window.hmProvider = new nokia.maps.heatmap.Overlay({
+					opacity: 1.0,
+					type: "density"
+				}));
+				// adding our data asset
+				hmProvider.addData(window.dataSet);
+				// adding the the provider as additional overlay
+				map.overlays.add(hmProvider);
+				// hiding the 100 markers
+				window.container.set("visibility", false);				
+			};
+			demo.kmlDemo = function() {
+				window.demo.createMap();
+				var kml = (window.kml = new nokia.maps.kml.Manager()),
+				// define a callback function which push the results to the map
+						onParsed = function (kmlManager) {
+						var resultSet,
+							container;
+						// KML file was successfully loaded
+						if (kmlManager.state == "finished") {
+							// KML file was successfully parsed
+							resultSet = new nokia.maps.kml.component.KMLResultSet(kmlManager.kmlDocument, map);
+							resultSet.addObserver("state", function (resultSet) {
+								if (resultSet.state == "finished") {
+									map.zoomTo(container.getBoundingBox());
+								}
+							});
+							window.map.objects.add(container = resultSet.create());
+						}
+					};
+				kml.addObserver("state", onParsed);
+				// Start parsing a kml file with given url
+				kml.parseKML("earthquakes.kml");
+				window.map.set("baseMapType", map.SATELLITE);
+				window.map.components.add(new nokia.maps.map.component.InfoBubbles());		
+			};
+			demo.runScript = function(name) {
+				if (!name || demo.scriptState === name) {
+					return;
+				}
+				var matrix = {
+					"mapcodeformap": demo.createMap,
+					"mapaddmarker": demo.addMarker,
+					"mapaddmoremarker": demo.addMoreMarker,
+					"mapanalytics": demo.analytics,
+					"mapkmldemo": demo.kmlDemo
+				};
+				if (matrix[name]) {
+					demo.scriptState = name;
+					matrix[name]();
+				}
+			};
+			$( function() {
+				$( "#presentation" ).fathom( {
+					topOffset: 0,
+					onActivateSlide: function(a){
+						if (this.id === "title") {
+							window.clearInterval(window.myTimer);
+							window.myTimer = null;
+							$("#counter").get(0).innerText = "00:00";
+							window.myCounter = 0;
+							return;
+						}
+						else 
+							if (demo[this.id]) {
+								demo[this.id]();
+							}
+						// start the timer if not already started and not in title frame (look above)
+						if (!window.myTimer) {
+							window.myTimer = window.setInterval(function(){
+								//start the watch and update the counter div
+								window.myCounter++;
+								var mins = (window.myCounter / 60) >> 0;
+								var sec = window.myCounter % 60;
+								$("#counter").get(0).innerText = (mins < 10 ? "0" : "") + mins + ":" + (sec < 10 ? "0" : "") + sec;
+							}, 1000);
+						}
+						// if the name contains a scriptlet ID, run it
+						demo.runScript(this.title);
+					}
+					/*timeline: [ 0, "5", "0:20", { time: 30 }, { time: "40", slide: 4 }, { time: 50, slide: "#slide5" }, "1:00", "1:15", 90, "2:00", { time: "2:35", slide: 0 }
+					],
+					video: {
+						source: "vimeo",
+						id: "16917950",
+						parent: "#vimeo",
+						autoplay: true
+					}*/
+				} );
+			} );
+		</script>
+		<script type="text/javascript" charset="UTF-8" src="http://api.maps.nokia.com/2.2.0/jsl.js?with=datarendering"></script>
+	</head>
+	<body>
+		<div id="top_bar">
+			<div id="counter"></div>		
+			<div id="example_bar"></div>
+		</div>
+		<div id="bottom_bar">
+			<div id="presentation">	
+				<div id="title" class="slide" title="title">
+					<h2>From Data to Meaning in 20 mins</h2>
+					<h4>Analytics and Rendering with Nokia Maps API</h4>
+					<p>
+						<h4>&nbsp;</h4>
+						<h4>http://api.maps.nokia.com</h4>
+					</p>
+				</div>
+				<div id="hide_map" class="slide" title="prerequisites">
+					<h2>Prerequisites</h2>
+					<ul>
+						<li>#1 Browser</li>
+						<li>#2 Nokia Maps API for Web</li>
+						<li>#3 Text Editor / IDE</li>
+					</ul>
+				</div>
+				<div id="hide_map" class="slide" title="titlecodeformap">
+					<h2>The code for your map goes here...</h2>
+				</div>
+				<div id="hide_map" class="slide" title="codeformap">
+					<form><textarea id="simple_map_code" name="simple_map_code">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<script type="text/javascript" charset="UTF-8" 
+		src="http://api.maps.nokia.com/2.2.0/jsl.js?with=datarendering"></script>
+</head>
+<body style="margin: 0;">
+	<div id="mapContainer" style="width: 100%; height: 100%; top: 0, left: 0, position: absolute;"></div>
+	<script type="text/javascript">
+		// Providing credentials, the ones mentioned here are just dummies
+		nokia.Settings.set("appId","DEMO");
+		nokia.Settings.set("authenticationToken", "V0NTRjIwMTI=");
+		var map = new nokia.maps.map.Display(document.getElementById("mapContainer"), {
+			center: [52.51, 13.4], // Berlin
+			zoomLevel: 8,
+			components: [
+				// Behaviour component allows interaction with the map
+				new nokia.maps.map.component.Behavior()
+			]
+		});															
+	</script>
+</body>
+</html>
+						</textarea></form>
+						<h2>&nbsp;</h2>
+						<h3>This code will create an interactive map without controls</h3>
+				</div>				
+				<div id="show_map" class="slide" title="mapcodeformap">
+				</div>
+				<div id="hide_map" class="slide" title="titleaddmarker">
+					<h2>That was easy :-)</h2>
+					<h3>&nbsp;</h3>
+					<h3>Now let's create some data</h3>
+				</div>
+				<div id="hide_map" class="slide" title="addmarker">
+					<form><textarea id="addmarker" name="addmarker">
+...
+//create data
+var singleData = {
+	id: "Where Camp", 
+	latitude: 52.54452,
+	longitude: 13.35467
+},
+// create a Marker out of the given data
+marker = new nokia.maps.map.Marker(singleData);
+// show the Marker on the map
+map.objects.add(marker);
+// set the center of the map
+map.set("center", singleData);
+					</textarea></form>
+					<h2>&nbsp;</h2>
+					<h4>Creating a data entry for a location and place a marker on the map right there...</h4>					
+				</div>
+				<div id="show_map_half" class="slide" title="mapaddmarker">
+					<h1>&nbsp;</h1>
+					<h2>Getting a little closer</h2>
+					<h3>&nbsp;</h3>					
+					<h3>Let's create much more data...</h3>
+				</div>
+				<div id="hide_map" class="slide" title="addmoremarker">
+					<form><textarea id="addmoremarker" name="addmoremarker">
+...
+//create data
+var dataSet = [],
+	lat = singleData.latitude,
+	lng = singleData.longitude,
+	// create a container to group the created markers
+	container = new nokia.maps.map.Container();
+// create 100 data entries and Markers out of it
+for (var i=0, d; i<100; i++) {
+	d = {
+		id: "Dummy "+i,
+		latitude: lat + Math.random() / i - 0.1,
+		longitude: lng + Math.random() / i - 0.1		
+	};
+	dataSet.push(d);
+	container.objects.add(new nokia.maps.map.Marker(d));
+}
+// add the container with the 100 markers to the map
+map.objects.add(container);
+map.zoomTo(container.getBoundingBox());
+					</textarea></form>
+					<h2>&nbsp;</h2>
+					<h3>Place 100 random Markers on the map</h3>					
+				</div>
+				<div id="show_map" class="slide" title="mapaddmoremarker">
+				</div>
+				<div id="show_map_half" class="slide" title="addmoremarker">
+					<form  style="margin-top:190px" ><textarea id="colorizemarker" name="colorizemarker">
+...
+iconSVG = '<svg width="33" height="33" xmlns="http://www.w3.org/2000/svg">' +
+	'<circle stroke="__ACCENTCOLOR__" fill="__MAINCOLOR__" cx="16" cy="16" r="16" />' +
+	'<text x="16" y="20" font-size="10pt" font-family="arial" font-weight="bold" text-anchor="middle" fill="__ACCENTCOLOR__" textContent="__TEXTCONTENT__">__TEXT__</text>' +
+	'</svg>',
+	svgParser = new nokia.maps.gfx.SvgParser(),
+	createIcon = function (text, mainColor, accentColor) {
+		var svg = iconSVG
+			.replace(/__TEXTCONTENT__/g, text)
+			.replace(/__TEXT__/g, text)
+			.replace(/__ACCENTCOLOR__/g, accentColor)
+			.replace(/__MAINCOLOR__/g, mainColor);
+		return new nokia.maps.gfx.GraphicsImage(svgParser.parseSvg(svg));
+	};
+for (var i=0, d; i<100; i++) {
+	container.objects.add(new nokia.maps.map.Marker(someLocation, {
+		icon: createIcon(i, '#'+Math.floor(Math.random()*16777215).toString(16), "#FFF")
+	}));
+}
+					</textarea></form>
+					<!-- h2>&nbsp;</h2>
+					<h3>Place 100 random Markers on the map</h3-->					
+				</div>
+				<div id="show_map_half" class="slide" title="titleanalytics">
+					<h1>&nbsp;</h1>
+					<h2>Where is the action?</h2>
+					<h4>&nbsp;</h4>
+					<h4>It's time to use the new heat map capabilities of the Nokia Maps API to visualize the created data</h4>
+				</div>
+				<div id="hide_map" class="slide" title="analytics">
+					<form><textarea id="analytics" name="analytics">
+...
+// taking advantage of the inbuilt provider architecture to overlay the map with additional layers
+var hmProvider = new nokia.maps.heatmap.Overlay({
+	opacity: 1.0,
+	type: "density"
+});
+// adding our data asset
+hmProvider.addData(dataSet);
+// adding the the provider as additional overlay
+map.overlays.add(hmProvider);
+// hiding the 100 markers
+container.set("visibility", false);
+					</textarea></form>
+					<h2>&nbsp;</h2>
+					<h3>A heat map is a data provider</h3>
+					<h4>&nbsp;</h4>
+					<h4>The Provider infrastructure allows for overlaying additional data on the map</h4>					
+				</div>
+				<div id="show_map" class="slide" title="mapanalytics">
+				</div>
+				<div id="show_map_half" class="slide" title="titlekmldemo">
+					<h1>&nbsp;</h1>
+					<h2>Beautiful Analytics</h2>
+				</div>
+				<div id="hide_map" class="slide" title="title2kmldemo">
+					<h2>You have already massive data?</h2>
+					<h4>&nbsp;</h4>
+					<h4>Don't worry! Integrated KML support offers a way to render it without any adaption!</h4>
+				</div>
+				<div id="hide_map" class="slide" title="kmldemo">
+					<form><textarea id="kmldemo" name="kmldemo">
+var kml = new nokia.maps.kml.Manager(),
+	// define a callback function which pushes the results to the map
+	onParsed = function (kmlManager) {
+	var resultSet,
+		container;
+	// KML file was successfully loaded
+	if (kmlManager.state == "finished") {
+		resultSet = new nokia.maps.kml.component.KMLResultSet(kmlManager.kmlDocument, map);
+		resultSet.addObserver("state", function (resultSet) {
+			if (resultSet.state == "finished") {
+				map.zoomTo(container.getBoundingBox());
+			}
+		});
+		map.objects.add(container = resultSet.create());
+	}
+};
+kml.addObserver("state", onParsed);
+// Start parsing a kml file with given url
+kml.parseKML("earthquakes.kml");
+// change map style to satellite
+map.set("baseMapType", map.SATELLITE);
+					</textarea></form>
+					<h2>&nbsp;</h2>
+					<h3>With a few lines of code...</h3>
+				</div>																				
+				<div id="show_map" class="slide" title="mapkmldemo">
+				</div>
+				<div id="show_map_half" class="slide" title="titleconclusion">
+					<h1>&nbsp;</h1>
+					<h3>... You get the complete content of the KML file visualized.</h3>
+					<h3>&nbsp;</h3>
+					<h3>Including interaction!</h3>
+				</div>
+				<div id="hide_map" class="slide" title="conclusion">
+					<h2>Lessons learned with Nokia Maps API</h2>
+					<ul>
+						<li>#1 Show a map</li>
+						<li>#2 Adding markers</li>
+						<li>#3 Render a heat map</li>
+						<li>#4 Visualize KML file content</li>
+					</ul>
+				</div>
+				<div id="hide_map" class="slide" title="qanda">
+					<h1>Q & A</h1>
+				</div>
+				<div id="hide_map" class="slide" title="thanks">
+					<h1>Thanks</h1>
+					<h2>&nbsp;</h2>
+				</div>																
+			</div>					
+		</div>
+		<script type="text/javascript">
+			var areaIds = ["simple_map_code", "addmarker", "addmoremarker", "colorizemarker", "analytics", "kmldemo"];
+			// Use CodeMirror to provide code highlighting 
+			for (var i=0, l=areaIds.length; i<l; i++ ) {
+				CodeMirror.fromTextArea(document.getElementById(areaIds[i]), {
+		        	lineNumbers: true
+		      	});				
+			}
+		</script>
+	</body>
+</html>
